@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import os
 from urllib import quote, unquote
 from io import BytesIO
 try:
@@ -88,6 +89,16 @@ class PDFHandler(ImagingHandler):
                 raise tornado.web.HTTPError(400)
             # store it in storage
             yield gen.maybe_future(pdf.put(path, data))
+
+        # set valid file name in headers
+        name = os.path.basename(kwargs.get('image', None))
+        if name:
+            self.set_header(
+                'Content-Disposition',
+                'inline; filename="{name}"'.format(
+                    name=name
+                )
+            )
 
         # Call the original ImageHandler.get method to serve the image.
         super(PDFHandler, self).get(**kwargs)
