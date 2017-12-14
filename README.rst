@@ -27,7 +27,7 @@ Installation
     .. code-block:: bash
 
         COMMUNITY_EXTENSIONS = [
-            'tc_shortener',
+            'tc_pdf',
             ...
         ]
 
