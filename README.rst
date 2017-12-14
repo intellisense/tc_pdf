@@ -10,6 +10,12 @@ Given a PDF URL return preview image of first page
 
 Installation
 ------------
+
+- Prerequisite: Following system libraries are required:
+
+        - `ImageMagick <https://www.imagemagick.org/script/index.php>`_
+        - `Ghostscript <https://www.ghostscript.com/>`_
+
 - Install using ``pip``
 
     .. code-block:: bash
