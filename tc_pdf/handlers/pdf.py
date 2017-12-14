@@ -57,7 +57,7 @@ class PDFHandler(ImagingHandler):
     @gen.coroutine
     def get(self, **kwargs):
         # check if request is valid
-        self.check_pdf(kwargs.copy())
+        yield gen.maybe_future(self.check_pdf(kwargs.copy()))
 
         pdf = PDF(self.context)
         pdf_path = kwargs.pop('pdf')
