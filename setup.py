@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='tc_pdf',
-    version='0.0.4',
+    version='0.0.5',
     url='http://github.com/intellisense/tc_pdf',
     license='MIT',
     author='Aamir Rind',
