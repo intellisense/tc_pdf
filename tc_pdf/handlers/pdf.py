@@ -15,9 +15,10 @@ from thumbor.url import Url
 from thumbor.utils import logger
 import tornado.gen as gen
 import tornado
-from tornado import httputil
+from tornado import httputil, httpclient
 
 from wand.image import Image, Color
+from wand.exceptions import WandException
 from libthumbor import CryptoURL
 from tc_core.web import RequestParser
 
@@ -65,6 +66,19 @@ class PDFHandler(ImagingHandler):
         url_parts, pdf_url = pdf.url_parts(pdf_path)
         preview_path = pdf_path.replace('/pdf/', '').replace('.pdf', '.png')
 
+        # Check if preview image already exists
+        path = quote(preview_path.encode('utf-8'))
+        exists = yield gen.maybe_future(pdf.get(path))
+        if not exists:
+            # create a new preview
+            data = yield self.create_preview(pdf_url)
+            if not data:
+                raise tornado.web.HTTPError(400)
+            # store it in storage
+            yield gen.maybe_future(pdf.put(path, data))
+        else:
+            logger.debug('PDF preview already exists..')
+
         crypto = CryptoURL(key=self.context.server.security_key)
         options = {k: v for k, v in kwargs.items() if v and k != 'hash'}
         preview_url = crypto.generate(image_url=preview_path, **options)
@@ -77,18 +91,6 @@ class PDFHandler(ImagingHandler):
         kwargs['request'] = self.request
         kwargs['image'] = preview_path
         self.context.request = RequestParameters(**kwargs)
-
-        # Check if preview image already exists
-        path = quote(kwargs['image'].encode('utf-8'))
-        exists = yield gen.maybe_future(pdf.get(path))
-        if not exists:
-            # create a new preview
-            data = yield self.create_preview(pdf_url)
-            if not data:
-                logger.error('Failed to create pdf preview...')
-                raise tornado.web.HTTPError(400)
-            # store it in storage
-            yield gen.maybe_future(pdf.put(path, data))
 
         # set valid file name in headers
         name = os.path.basename(kwargs.get('image', None))
@@ -107,17 +109,26 @@ class PDFHandler(ImagingHandler):
     def create_preview(self, url, resolution=200):
         out_io = BytesIO()
         try:
-            response = urlopen(url)
-            if response.code == 200:
-                with(Image(blob=response.read(), resolution=resolution)) as source:
-                    single_image = source.sequence[0]  # Just work on first page
-                    with Image(single_image) as i:
-                        i.format = 'png'
-                        i.background_color = Color('white')  # Set white background.
-                        i.alpha_channel = 'remove'  # Remove transparency and replace with bg.
-                        i.save(file=out_io)
-                        raise gen.Return(out_io.getvalue())
-        except HTTPError as e:
+            http_client = httpclient.AsyncHTTPClient()
+            response = yield http_client.fetch(url)
+            if not response.error:
+                try:
+                    with(Image(blob=response.body, resolution=resolution)) as source:
+                        single_image = source.sequence[0]  # Just work on first page
+                        with Image(single_image) as i:
+                            i.format = 'png'
+                            i.background_color = Color('white')  # Set white background.
+                            i.alpha_channel = 'remove'  # Remove transparency and replace with bg.
+                            i.save(file=out_io)
+                            raise gen.Return(out_io.getvalue())
+
+                except WandException as e:
+                    logger.exception('[PDFHander.create_preview] %s', e)
+                    raise gen.Return(None)
+            else:
+                logger.error('STATUS: %s - Failed to get pdf from url %s' % (str(400), url))
+                raise tornado.web.HTTPError(400)
+        except httpclient.HTTPError as e:
             logger.error('STATUS: %s - Failed to get pdf from url %s' % (str(e.code), url))
             valid_status_code = httputil.responses.get(e.code)
             if valid_status_code:
