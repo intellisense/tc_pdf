@@ -3,11 +3,6 @@ from __future__ import absolute_import
 import os
 from urllib import quote, unquote
 from io import BytesIO
-try:
-    from urllib2 import urlopen, HTTPError
-except ImportError:
-    from urllib.request import urlopen
-    from urllib.error import HTTPError
 
 from thumbor.context import RequestParameters
 from thumbor.handlers.imaging import ImagingHandler
