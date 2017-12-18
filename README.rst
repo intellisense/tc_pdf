@@ -46,7 +46,7 @@ Usage
 
         http://<thumbor_server>/unsafe/240x240/smart/pdf/localhost:8000/media/document/test.pdf
 
-If you are using `libthumbor <https://github.com/thumbor/libthumbor>`_ to generate URLs then you can use this patch for ``CryptoURL`` class and then use it like this:
+If you are using `libthumbor <https://github.com/thumbor/libthumbor>`_ to generate URLs then you can use this `patch <https://gist.github.com/intellisense/46538f858de8bf9bceee6a7fe0b0f245>`_ for ``CryptoURL`` class and then use it like this:
 
     .. code-block::
     
