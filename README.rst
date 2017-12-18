@@ -45,3 +45,19 @@ Usage
     .. code-block::
 
         http://<thumbor_server>/unsafe/240x240/smart/pdf/localhost:8000/media/document/test.pdf
+
+If you are using `libthumbor <https://github.com/thumbor/libthumbor>`_ to generate URLs then you can use this patch for ``CryptoURL`` class and then use it like this:
+
+    .. code-block::
+    
+        from crypto import CryptoURL
+        
+        crypto = CryptoURL(key='my-security-key')
+
+        encrypted_url = crypto.generate(
+            width=300,
+            height=200,
+            smart=True,
+            image_url='/path/to/my/pdf_file.pdf',
+            pdf=True, # <-- Pass this
+        )
