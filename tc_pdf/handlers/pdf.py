@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import os
 from urllib import quote, unquote
 from io import BytesIO
+from tempfile import NamedTemporaryFile
 
 from thumbor.context import RequestParameters
 from thumbor.handlers.imaging import ImagingHandler
@@ -107,17 +108,24 @@ class PDFHandler(ImagingHandler):
             http_client = httpclient.AsyncHTTPClient()
             response = yield http_client.fetch(url)
             if not response.error:
+                f = NamedTemporaryFile(prefix='tc_pdf_temp', suffix='.pdf', dir='/tmp', mode='w+b', delete=False)
                 try:
-                    with(Image(blob=response.body, resolution=resolution)) as source:
-                        single_image = source.sequence[0]  # Just work on first page
-                        with Image(single_image) as i:
+                    f.write(response.body)
+                    f.close()
+                    with(Image(filename=f.name+ '[0]', resolution=resolution)) as source:
+                        # single_image = source.sequence[0]  # Just work on first page
+                        # pdfimage = source.convert("png")
+                        # single_image = pdfimage.sequence[0]  # Just work on first page
+                        with Image(source) as i:
                             i.format = 'png'
                             i.background_color = Color('white')  # Set white background.
                             i.alpha_channel = 'remove'  # Remove transparency and replace with bg.
                             i.save(file=out_io)
+                            os.remove(f.name)
                             raise gen.Return(out_io.getvalue())
 
                 except WandException as e:
+                    os.remove(f.name)
                     logger.exception('[PDFHander.create_preview] %s', e)
                     raise gen.Return(None)
             else:
