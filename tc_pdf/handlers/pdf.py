@@ -1,14 +1,13 @@
 from __future__ import absolute_import
 
 import os
-from urllib import quote, unquote
+from urllib.parse import quote, unquote
 from io import BytesIO
 
 from thumbor.context import RequestParameters
 from thumbor.handlers.imaging import ImagingHandler
 from thumbor.url import Url
 from thumbor.utils import logger
-import tornado.gen as gen
 import tornado
 from tornado import httputil, httpclient
 
@@ -51,10 +50,9 @@ class PDFHandler(ImagingHandler):
 
         return ''.join(reg)
 
-    @gen.coroutine
-    def get(self, **kwargs):
+    async def get(self, **kwargs):
         # check if request is valid
-        yield gen.maybe_future(self.check_pdf(kwargs.copy()))
+        await self.check_pdf(kwargs.copy())
 
         pdf = PDF(self.context)
         pdf_path = kwargs.pop('pdf')
@@ -63,21 +61,25 @@ class PDFHandler(ImagingHandler):
 
         # Check if preview image already exists
         path = quote(preview_path.encode('utf-8'))
-        exists = yield gen.maybe_future(pdf.get(path))
+        exists = await pdf.get(path)
         if not exists:
             # create a new preview
-            data = yield self.create_preview(pdf_url)
+            data = await self.create_preview(pdf_url)
             if not data:
                 raise tornado.web.HTTPError(400)
             # store it in storage
-            yield gen.maybe_future(pdf.put(path, data))
+            await pdf.put(path, data)
         else:
             logger.debug('PDF preview already exists..')
 
         crypto = CryptoURL(key=self.context.server.security_key)
         options = {k: v for k, v in kwargs.items() if v and k != 'hash'}
         preview_url = crypto.generate(image_url=preview_path, **options)
-        kwargs['hash'] = RequestParser.path_to_parameters(preview_url)['hash']
+        parameters = RequestParser.path_to_parameters(preview_url)
+        for parameter in parameters:
+            if parameter[0] == 'hash':
+                kwargs['hash'] = parameter[1]
+                break
 
         # Patch the request uri to allow normal thumbor operations
         self.request.uri = preview_url
@@ -98,14 +100,13 @@ class PDFHandler(ImagingHandler):
             )
 
         # Call the original ImageHandler.get method to serve the image.
-        super(PDFHandler, self).get(**kwargs)
+        return await super(PDFHandler, self).get(**kwargs)
 
-    @gen.coroutine
-    def create_preview(self, url, resolution=200):
+    async def create_preview(self, url, resolution=200):
         out_io = BytesIO()
         try:
             http_client = httpclient.AsyncHTTPClient()
-            response = yield http_client.fetch(url)
+            response = await http_client.fetch(url)
             if not response.error:
                 try:
                     with(Image(blob=response.body, resolution=resolution)) as source:
@@ -115,11 +116,11 @@ class PDFHandler(ImagingHandler):
                             i.background_color = Color('white')  # Set white background.
                             i.alpha_channel = 'remove'  # Remove transparency and replace with bg.
                             i.save(file=out_io)
-                            raise gen.Return(out_io.getvalue())
+                            return out_io.getvalue()
 
                 except WandException as e:
                     logger.exception('[PDFHander.create_preview] %s', e)
-                    raise gen.Return(None)
+                    return None
             else:
                 logger.error('STATUS: %s - Failed to get pdf from url %s' % (str(400), url))
                 raise tornado.web.HTTPError(400)
@@ -133,12 +134,10 @@ class PDFHandler(ImagingHandler):
         finally:
             out_io.close()
 
-    @gen.coroutine  # NOQA
-    def check_pdf(self, kw):
+    async def check_pdf(self, kw):
         if self.context.config.MAX_ID_LENGTH > 0:
             # Check if pdf with an uuid exists in storage
-            exists = yield gen.maybe_future(
-                self.context.modules.storage.exists(kw['pdf'][:self.context.config.MAX_ID_LENGTH]))
+            exists = await self.context.modules.storage.exists(kw['pdf'][:self.context.config.MAX_ID_LENGTH])
             if exists:
                 kw['pdf'] = kw['pdf'][:self.context.config.MAX_ID_LENGTH]
 
@@ -164,7 +163,7 @@ class PDFHandler(ImagingHandler):
             return
 
         if self.context.config.USE_BLACKLIST:
-            blacklist = yield self.get_blacklist_contents()
+            blacklist = await self.get_blacklist_contents()
             if self.context.request.pdf_url in blacklist:
                 self._error(400, 'Source pdf url has been blacklisted: %s' % self.context.request.pdf_url)
                 return
@@ -186,8 +185,7 @@ class PDFHandler(ImagingHandler):
 
             if not valid and self.context.config.STORES_CRYPTO_KEY_FOR_EACH_IMAGE:
                 # Retrieves security key for this pdf if it has been seen before
-                security_key = yield gen.maybe_future(
-                    self.context.modules.storage.get_crypto(self.context.request.pdf_url))
+                security_key = await self.context.modules.storage.get_crypto(self.context.request.pdf_url)
                 if security_key is not None:
                     signer = self.context.modules.url_signer(security_key)
                     valid = signer.validate(url_signature, url_to_validate)
