@@ -78,7 +78,7 @@ class PDFHandler(ImagingHandler):
         parameters = RequestParser.path_to_parameters(preview_url)
         for parameter in parameters:
             if parameter[0] == 'hash':
-                kwargs['hash'] = parameter[1]
+                kwargs['hash'] = parameter[1].decode()
                 break
 
         # Patch the request uri to allow normal thumbor operations
