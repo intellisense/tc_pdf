@@ -181,7 +181,7 @@ class PDFHandler(ImagingHandler):
             url_to_validate = url.replace('/%s/' % self.context.request.hash, '') \
                 .replace('/%s/' % quoted_hash, '')
 
-            valid = signer.validate(unquote(url_signature), url_to_validate)
+            valid = signer.validate(unquote(url_signature).encode(), url_to_validate)
 
             if not valid and self.context.config.STORES_CRYPTO_KEY_FOR_EACH_IMAGE:
                 # Retrieves security key for this pdf if it has been seen before
