@@ -77,7 +77,7 @@ class PDFHandler(ImagingHandler):
         preview_url = crypto.generate(image_url=preview_path, **options)
         parameters = RequestParser.path_to_parameters(preview_url)
         for parameter in parameters:
-            if parameter[0] == 'hash':
+            if parameter[0] == 'hash' and parameter[1]:
                 kwargs['hash'] = parameter[1].decode()
                 break
 
