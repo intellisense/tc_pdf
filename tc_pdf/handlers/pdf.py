@@ -53,6 +53,10 @@ class PDFHandler(ImagingHandler):
     async def get(self, **kwargs):
         # check if request is valid
         await self.check_pdf(kwargs.copy())
+        # return early if at this point the request isn't valid
+        status = self.get_status()
+        if status != 200:
+            return
 
         pdf = PDF(self.context)
         pdf_path = kwargs.pop('pdf')
