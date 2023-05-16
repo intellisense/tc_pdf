@@ -119,7 +119,7 @@ class PDFHandler(ImagingHandler):
                             return out_io.getvalue()
 
                 except WandException as e:
-                    logger.exception('[PDFHander.create_preview] %s', e)
+                    logger.exception('[PDFHandler.create_preview] %s', e)
                     return None
             else:
                 logger.error('STATUS: %s - Failed to get pdf from url %s' % (str(400), url))
